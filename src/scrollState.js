@@ -18,12 +18,33 @@ export const prefersReducedMotion =
 let lenis = null
 
 export function initSmoothScroll() {
+  const onPointer = (e) => {
+    pointerState.x = (e.clientX / window.innerWidth) * 2 - 1
+    pointerState.y = (e.clientY / window.innerHeight) * 2 - 1
+  }
+  window.addEventListener('pointermove', onPointer, { passive: true })
+
+  if (prefersReducedMotion) {
+    // Native scroll, no inertia: motion tracks the finger exactly.
+    const onScroll = () => {
+      const limit = document.documentElement.scrollHeight - window.innerHeight
+      scrollState.progress = limit > 0 ? Math.min(1, Math.max(0, window.scrollY / limit)) : 0
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    onScroll()
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('pointermove', onPointer)
+    }
+  }
+
   lenis = new Lenis({
-    duration: prefersReducedMotion ? 0 : 1.35,
-    smoothWheel: !prefersReducedMotion,
+    autoRaf: false,
+    duration: 1.35,
+    easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
   })
 
-  lenis.on('scroll', ({ scroll, limit }) => {
+  const off = lenis.on('scroll', ({ scroll, limit }) => {
     scrollState.progress = limit > 0 ? Math.min(1, Math.max(0, scroll / limit)) : 0
   })
 
@@ -32,15 +53,10 @@ export function initSmoothScroll() {
     rafId = requestAnimationFrame(raf)
   })
 
-  const onPointer = (e) => {
-    pointerState.x = (e.clientX / window.innerWidth) * 2 - 1
-    pointerState.y = (e.clientY / window.innerHeight) * 2 - 1
-  }
-  window.addEventListener('pointermove', onPointer, { passive: true })
-
   return () => {
     cancelAnimationFrame(rafId)
     window.removeEventListener('pointermove', onPointer)
+    off()
     lenis.destroy()
     lenis = null
   }
@@ -48,8 +64,8 @@ export function initSmoothScroll() {
 
 export function scrollBackToMorning() {
   if (lenis) {
-    lenis.scrollTo(0, { duration: prefersReducedMotion ? 0 : 4.5 })
+    lenis.scrollTo(0, { duration: 4.5 })
   } else {
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    window.scrollTo({ top: 0, behavior: 'auto' })
   }
 }
