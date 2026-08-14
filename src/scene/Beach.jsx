@@ -92,7 +92,19 @@ const SandMat = shaderMaterial(
     float fleck = hash12(floor(P.xz * 9.0) + 4.7);
     col *= 1.0 - step(0.978, fleck) * 0.16;
     float mica = hash12(floor(P.xz * 16.0) + 9.1);
-    col += vec3(1.0, 0.96, 0.85) * step(0.988, mica) * 0.1;
+    col += vec3(1.0, 0.96, 0.85) * step(0.988, mica) * 0.12;
+
+    // broken shells the tide ground down: rose and seafoam chips up close
+    float nearField = smoothstep(42.0, 10.0, length(P - cameraPosition));
+    float chip = hash12(floor(P.xz * 5.0) + 77.0);
+    vec2 chipUv = fract(P.xz * 5.0) - 0.5;
+    float chipShape = smoothstep(0.3, 0.16, length(chipUv + (fbm(P.xz * 3.0) - 0.5) * 0.3));
+    vec3 chipCol = mix(vec3(0.93, 0.68, 0.64), vec3(0.64, 0.82, 0.77),
+      step(0.5, hash12(floor(P.xz * 5.0) + 123.0)));
+    col = mix(col, chipCol, step(0.955, chip) * chipShape * 0.6 * nearField);
+
+    // the whole beach holds a little more light than it should
+    col *= 1.045;
 
     // The tide's reach: a wet band that breathes near the waterline
     float waver = sin(P.x * 0.075) * 1.8 + sin(P.x * 0.028 + 2.0) * 1.4;

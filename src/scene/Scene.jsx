@@ -38,8 +38,8 @@ function Atmosphere() {
   return (
     <>
       <fog ref={fogRef} attach="fog" args={['#E8D5C0', 65, 360]} />
-      <hemisphereLight ref={hemi} intensity={0.95} />
-      <directionalLight ref={sun} intensity={1.15} />
+      <hemisphereLight ref={hemi} intensity={1.12} />
+      <directionalLight ref={sun} intensity={1.25} />
     </>
   )
 }
@@ -59,7 +59,7 @@ export default function Scene({ onReady, started }) {
   return (
     <Canvas
       flat
-      dpr={[1, 1.25]}
+      dpr={[1, 1.6]}
       gl={{ antialias: true, powerPreference: 'high-performance' }}
       camera={{ fov: 55, near: 0.1, far: 900, position: [0, 3, 10] }}
       aria-hidden="true"

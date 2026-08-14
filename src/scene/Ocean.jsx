@@ -8,7 +8,7 @@ import { SHORELINE_Z } from './layout.js'
 const OceanMat = shaderMaterial(
   {
     uTime: 0,
-    uSwellAmp: 0.55,
+    uSwellAmp: 0.38,
     uDeep: new THREE.Color('#3F7590'),
     uShallow: new THREE.Color('#8FC5C4'),
     uFoam: new THREE.Color('#F7EFE2'),
@@ -125,6 +125,19 @@ const OceanMat = shaderMaterial(
     float strokeC = fbm(vec2(P.x * 0.3 + t * 0.012, P.z * 4.5));
     float nearRough = 1.0 + smoothstep(120.0, 25.0, length(P - cameraPosition)) * 0.55;
     col *= 1.0 + ((strokeA - 0.5) * 0.3 + (strokeB - 0.5) * 0.17 + (strokeC - 0.5) * 0.09) * nearRough;
+
+    // fine interlocking wavelets, the close-up embroidery of calm water
+    float wavelet = fbm(P.xz * vec2(0.9, 1.7) + vec2(t * 0.05, -t * 0.035));
+    col *= 1.0 + (wavelet - 0.5) * 0.12 * smoothstep(150.0, 25.0, length(P - cameraPosition));
+
+    // a dreaming sheen: each channel breathes over its own slow field,
+    // so the surface shifts mint, lilac, gold as you look across it
+    vec3 sheen = vec3(
+      fbm(P.xz * 0.11 + vec2(7.0, 1.0) + t * 0.008),
+      fbm(P.xz * 0.11 + vec2(21.0, 9.0) - t * 0.006),
+      fbm(P.xz * 0.11 + vec2(40.0, 17.0) + t * 0.01)
+    );
+    col *= vec3(1.0) + (sheen - 0.5) * vec3(0.06, 0.08, 0.11);
 
     // Crests catch the sun, troughs hold the deep
     col = mix(col, col * 0.92 + uDeep * 0.08, clamp(-vSwell, 0.0, 1.0) * 0.5);

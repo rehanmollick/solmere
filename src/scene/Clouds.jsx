@@ -21,6 +21,8 @@ const CloudMat = shaderMaterial(
     uLit: new THREE.Color('#FDF0DC'),
     uMid: new THREE.Color('#E0CCC8'),
     uShadow: new THREE.Color('#C9B8C4'),
+    uRimTint: new THREE.Color('#FFEBC2'),
+    uDeepTint: new THREE.Color('#7E88B8'),
     uOpacity: 1,
   },
   /* glsl */ `
@@ -35,6 +37,8 @@ const CloudMat = shaderMaterial(
   uniform vec3 uLit;
   uniform vec3 uMid;
   uniform vec3 uShadow;
+  uniform vec3 uRimTint;
+  uniform vec3 uDeepTint;
   uniform float uOpacity;
   varying vec2 vUv;
 
@@ -44,6 +48,9 @@ const CloudMat = shaderMaterial(
     float luma = smoothstep(0.26, 0.97, tex.r);
     vec3 col = mix(uShadow, uMid, smoothstep(0.16, 0.52, luma));
     col = mix(col, uLit, smoothstep(0.56, 0.93, luma));
+    // the crowns catch the sun's own color, the caves go violet
+    col = mix(col, uRimTint, smoothstep(0.86, 1.0, luma) * 0.5);
+    col = mix(col, uDeepTint, (1.0 - smoothstep(0.05, 0.24, luma)) * 0.45);
     float a = tex.a * uOpacity;
     if (a < 0.01) discard;
     gl_FragColor = vec4(col, a);
@@ -180,6 +187,8 @@ export default function Clouds() {
       m.uniforms.uLit.value.copy(scratch.lit)
       m.uniforms.uMid.value.copy(scratch.mid)
       m.uniforms.uShadow.value.copy(scratch.shadow)
+      m.uniforms.uRimTint.value.copy(dayState.colors.sunHalo).lerp(scratch.lit, 0.35)
+      m.uniforms.uDeepTint.value.copy(dayState.colors.skyZenith).lerp(scratch.shadow, 0.5)
       m.uOpacity = c.opacity * edgeFade * (1 - dayState.dusk * (c.band === 'cirrus' ? 0.5 : 0.08))
     }
   })

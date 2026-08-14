@@ -4,7 +4,13 @@ import { extend, useFrame } from '@react-three/fiber'
 import { shaderMaterial } from '@react-three/drei'
 import { dayState } from './day.js'
 import { ARCH_POS } from './layout.js'
-import { makeNoise2, fbm2, makeBushTexture } from './paintUtils.js'
+import {
+  makeNoise2,
+  fbm2,
+  makeBushTexture,
+  makeVineTexture,
+  makeFlowerTexture,
+} from './paintUtils.js'
 
 const RockMat = shaderMaterial(
   {
@@ -83,7 +89,14 @@ const RockMat = shaderMaterial(
     float mossMask = smoothstep(0.35, 0.7, N.y)
       * smoothstep(0.4, 0.75, fbm(P.xz * 0.25 + vec2(P.y * 0.18, 3.7)))
       * smoothstep(3.0, 10.0, P.y);
-    col = mix(col, uMoss, mossMask * 0.75);
+    col = mix(col, uMoss, mossMask * 0.85);
+
+    // lichen: soft colonies of sage and rust drifting across the faces
+    float lichen = smoothstep(0.6, 0.82, fbm(P.xy * 0.5 + P.z * 0.3 + 13.0))
+      * smoothstep(0.72, 0.45, fbm(P.xy * 1.7 + 31.0));
+    vec3 lichenCol = mix(vec3(0.71, 0.76, 0.6), vec3(0.85, 0.6, 0.42),
+      smoothstep(0.45, 0.55, fbm(P.xy * 0.16 + 91.0)));
+    col = mix(col, lichenCol * (0.6 + 0.4 * band), lichen * 0.28);
 
     // the sea keeps the feet of the rock dark
     col *= 1.0 - smoothstep(2.2, -0.5, P.y) * 0.22;
@@ -267,6 +280,30 @@ const BUSH_SPOTS = [
   [-3.5, 33, 10.5, 5.6],
   [0.5, 35.8, 10, 6.4],
   [4.5, 33.2, 10.5, 5.0],
+  [-7.5, 29.5, 10, 4.4],
+  [8.5, 29.8, 10, 4.2],
+  [-11, 24.5, 9.5, 3.8],
+  [11.5, 24, 9.5, 3.6],
+  [-13.5, 18.5, 9, 3.2],
+  [14, 18, 9, 3.0],
+  [-15, 11.5, 8.5, 2.8],
+  [15.5, 11, 8.5, 2.6],
+  [2, 30.5, 11, 3.4],
+]
+
+const VINE_SPOTS = [
+  // [x, topY, z, width, height] — one trails over the keyhole's brow
+  [0, 21.5, 8.5, 9, 10],
+  [-9, 27.5, 9, 7, 11],
+  [7.5, 28.5, 9, 6, 9],
+  [13, 21, 8.5, 5, 8],
+]
+
+const FLOWER_SPOTS = [
+  [-3, 33.5, 11, 4.2],
+  [1.5, 36.2, 10.5, 4.6],
+  [-11.5, 25, 10, 3.0],
+  [9, 30.2, 10.5, 3.2],
 ]
 
 export default function Arch() {
@@ -279,8 +316,12 @@ export default function Arch() {
   const isletGeoA = useMemo(() => buildIsletGeometry(55, 0.62), [])
   const isletGeoB = useMemo(() => buildIsletGeometry(89, 0.5), [])
   const bushTexture = useMemo(() => makeBushTexture(31), [])
+  const vineTexture = useMemo(() => makeVineTexture(17), [])
+  const flowerTexture = useMemo(() => makeFlowerTexture(43), [])
   const rockMat = useMemo(() => new RockMat(), [])
   const mossScratch = useMemo(() => new THREE.Color(), [])
+  const vineMats = useRef([])
+  const flowerMats = useRef([])
 
   const shaftPose = useMemo(() => {
     // steep enough that the camera sees the shaft side-on, never down its throat
@@ -301,7 +342,16 @@ export default function Arch() {
     rockMat.uniforms.uSunDir.value.copy(dayState.sunDir)
     rockMat.uGolden = dayState.golden
     for (const bm of bushMats.current) {
-      if (bm) bm.color.copy(dayState.colors.grassLit).lerp(dayState.colors.rockShadow, 0.3)
+      if (bm) bm.color.copy(dayState.colors.grassLit).lerp(dayState.colors.rockShadow, 0.22)
+    }
+    for (const vm of vineMats.current) {
+      if (vm) vm.color.copy(dayState.colors.grassLit).lerp(dayState.colors.rockShadow, 0.32)
+    }
+    for (const fm of flowerMats.current) {
+      if (fm) {
+        fm.color.set('#F2A0B4').lerp(dayState.colors.rockShadow, dayState.dusk * 0.55)
+        fm.opacity = 0.95 - dayState.dusk * 0.25
+      }
     }
     const intensity = dayState.golden * 0.42
     for (const s of [shaftA.current, shaftB.current]) {
@@ -332,6 +382,37 @@ export default function Arch() {
           <spriteMaterial
             ref={setBushMat(i)}
             map={bushTexture}
+            transparent
+            depthWrite={false}
+          />
+        </sprite>
+      ))}
+
+      {/* vines trailing off the ledges and over the keyhole's brow */}
+      {VINE_SPOTS.map(([x, topY, z, w, h], i) => (
+        <mesh key={`v${i}`} position={[x, topY - h / 2, z]}>
+          <planeGeometry args={[w, h]} />
+          <meshBasicMaterial
+            ref={(ref) => {
+              vineMats.current[i] = ref
+            }}
+            map={vineTexture}
+            transparent
+            depthWrite={false}
+            side={THREE.DoubleSide}
+            fog={false}
+          />
+        </mesh>
+      ))}
+
+      {/* blossoms scattered through the green */}
+      {FLOWER_SPOTS.map(([x, y, z, s], i) => (
+        <sprite key={`f${i}`} position={[x, y, z]} scale={[s, s, 1]}>
+          <spriteMaterial
+            ref={(ref) => {
+              flowerMats.current[i] = ref
+            }}
+            map={flowerTexture}
             transparent
             depthWrite={false}
           />

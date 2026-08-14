@@ -90,7 +90,7 @@ function paintCumulus(ctx, rnd, W, H, tiers, baseY, opts = {}) {
 
   // 4. interior brush texture
   for (const L of lobes) {
-    const n = Math.round(L.r * 0.5)
+    const n = Math.round(L.r * 0.8)
     for (let i = 0; i < n; i++) {
       const th = R(0, Math.PI * 2)
       const rho = L.r * 0.7 * Math.sqrt(rnd())
@@ -109,7 +109,7 @@ function paintCumulus(ctx, rnd, W, H, tiers, baseY, opts = {}) {
   // 5. rim cauliflower: one banding rule gives crisp sunlit scallops on the
   // upper left and soft shade on the lower right
   for (const L of lobes) {
-    const n = Math.round(L.r * 0.9)
+    const n = Math.round(L.r * 1.3)
     for (let i = 0; i < n; i++) {
       const th = R(0, Math.PI * 2)
       const rho = L.r * R(0.72, 1.03)
@@ -162,7 +162,7 @@ function paintCumulus(ctx, rnd, W, H, tiers, baseY, opts = {}) {
   // 8. crown highlights: crisp, last, always
   for (const L of lobes) {
     const isCrown = L.tier >= 0.55
-    const n = Math.round(L.r * (isCrown ? 0.6 : 0.35))
+    const n = Math.round(L.r * (isCrown ? 0.85 : 0.5))
     for (let i = 0; i < n; i++) {
       const th = LIGHT + R(-0.96, 0.96)
       const rho = L.r * R(0.86, 1.04)
@@ -247,9 +247,10 @@ export function makeBankTexture(seed) {
   const tiers = [
     { y: H * 0.74, halfW: W * 0.4, r: H * 0.17, count: 6 },
     { y: H * 0.56, halfW: W * 0.31, r: H * 0.15, count: 4 },
-    { y: H * 0.4, halfW: W * 0.2, r: H * 0.12, count: 3 },
+    { y: H * 0.42, halfW: W * 0.21, r: H * 0.12, count: 3 },
+    { y: H * 0.3, halfW: W * 0.12, r: H * 0.09, count: 2 },
   ]
-  paintCumulus(ctx, rnd, W, H, tiers, H * 0.8, { wisps: 10 })
+  paintCumulus(ctx, rnd, W, H, tiers, H * 0.8, { wisps: 12 })
   return finishTexture(canvas, rnd)
 }
 

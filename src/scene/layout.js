@@ -13,7 +13,7 @@ export function waterHeightAt(x, z, t) {
   h += 0.15 * Math.sin(x * 0.34 + z * 0.27 + t * 1.24 + 4.2)
   h += 0.09 * Math.sin(x * -0.53 + z * 0.41 + t * 1.71 + 2.3)
   const shoreCalm = THREE.MathUtils.smoothstep(Math.abs(z - SHORELINE_Z), 2, 26)
-  return h * 0.55 * (0.35 + 0.65 * shoreCalm)
+  return h * 0.38 * (0.35 + 0.65 * shoreCalm)
 }
 
 // The Keyhole: a stone arch in the sea, right of center

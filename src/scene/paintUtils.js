@@ -202,7 +202,8 @@ export function makeGrassTexture(seed) {
   return tex
 }
 
-/* Foliage for the arch ledges: rounder, denser than a cloud */
+/* Foliage for the arch ledges: dense leafy clumps, two tones of gray
+ * so a single tint gives lit and shaded leaves */
 export function makeBushTexture(seed) {
   const s = 256
   const rand = mulberry(seed)
@@ -210,17 +211,106 @@ export function makeBushTexture(seed) {
   canvas.width = s
   canvas.height = s
   const ctx = canvas.getContext('2d')
-  for (let i = 0; i < 16; i++) {
-    const x = s * (0.5 + (rand() - 0.5) * 0.5)
-    const y = s * (0.55 + (rand() - 0.5) * 0.4)
-    const r = s * (0.09 + rand() * 0.1)
-    const shade = 150 + Math.floor(rand() * 105)
+  // soft mass first
+  for (let i = 0; i < 10; i++) {
+    const x = s * (0.5 + (rand() - 0.5) * 0.45)
+    const y = s * (0.55 + (rand() - 0.5) * 0.38)
+    const r = s * (0.12 + rand() * 0.1)
+    const shade = 120 + Math.floor(rand() * 50)
     const g = ctx.createRadialGradient(x, y, r * 0.2, x, y, r)
-    g.addColorStop(0, `rgba(${shade},${shade},${shade},0.95)`)
+    g.addColorStop(0, `rgba(${shade},${shade},${shade},0.9)`)
     g.addColorStop(1, `rgba(${shade},${shade},${shade},0)`)
     ctx.fillStyle = g
     ctx.beginPath()
     ctx.arc(x, y, r, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  // then leaf chatter: many small crisp dabs, brighter on top
+  for (let i = 0; i < 90; i++) {
+    const x = s * (0.5 + (rand() - 0.5) * 0.6)
+    const y = s * (0.55 + (rand() - 0.5) * 0.5)
+    const up = 1 - (y / s)
+    const shade = 130 + Math.floor(up * 95 + rand() * 30)
+    ctx.fillStyle = `rgba(${shade},${shade},${shade},0.9)`
+    ctx.beginPath()
+    ctx.ellipse(x, y, 3 + rand() * 6, 2 + rand() * 4, rand() * Math.PI, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.colorSpace = THREE.SRGBColorSpace
+  return tex
+}
+
+/* Vines that hang off the arch: strands swaying down with leaf pairs */
+export function makeVineTexture(seed) {
+  const s = 512
+  const rand = mulberry(seed)
+  const canvas = document.createElement('canvas')
+  canvas.width = s
+  canvas.height = s
+  const ctx = canvas.getContext('2d')
+  const strands = 6
+  for (let v = 0; v < strands; v++) {
+    const x0 = s * (0.1 + (v / strands) * 0.8 + (rand() - 0.5) * 0.14)
+    const len = s * (0.5 + rand() * 0.46)
+    const sway = (rand() - 0.5) * s * 0.28
+    const steps = 34
+    for (let i = 0; i < steps; i++) {
+      const k = i / steps
+      if (k * s > len) break
+      const x = x0 + Math.sin(k * Math.PI * 1.4 + v * 2.1) * sway * k
+      const y = k * len
+      // stem
+      ctx.fillStyle = 'rgba(90,90,90,0.9)'
+      ctx.beginPath()
+      ctx.arc(x, y, 2.2, 0, Math.PI * 2)
+      ctx.fill()
+      // leaves in loose clumps, brighter near the top light
+      if (rand() < 0.5) {
+        const shade = 115 + Math.floor((1 - k) * 95 + rand() * 40)
+        const side = rand() > 0.5 ? 1 : -1
+        ctx.fillStyle = `rgba(${shade},${shade},${shade},0.94)`
+        ctx.beginPath()
+        ctx.ellipse(
+          x + side * (6 + rand() * 5),
+          y + 2 + rand() * 3,
+          6.5 + rand() * 5,
+          3.6 + rand() * 2,
+          side * (0.4 + rand() * 0.5),
+          0,
+          Math.PI * 2
+        )
+        ctx.fill()
+      }
+    }
+  }
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.colorSpace = THREE.SRGBColorSpace
+  return tex
+}
+
+/* A handful of tiny blossoms to scatter over the greenery */
+export function makeFlowerTexture(seed) {
+  const s = 256
+  const rand = mulberry(seed)
+  const canvas = document.createElement('canvas')
+  canvas.width = s
+  canvas.height = s
+  const ctx = canvas.getContext('2d')
+  for (let i = 0; i < 26; i++) {
+    const x = s * (0.5 + (rand() - 0.5) * 0.8)
+    const y = s * (0.5 + (rand() - 0.5) * 0.8)
+    const r = 2.5 + rand() * 3.5
+    for (let p = 0; p < 5; p++) {
+      const a = (p / 5) * Math.PI * 2 + rand()
+      ctx.fillStyle = 'rgba(255,255,255,0.95)'
+      ctx.beginPath()
+      ctx.arc(x + Math.cos(a) * r * 0.8, y + Math.sin(a) * r * 0.8, r * 0.55, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    ctx.fillStyle = 'rgba(255,236,180,0.95)'
+    ctx.beginPath()
+    ctx.arc(x, y, r * 0.4, 0, Math.PI * 2)
     ctx.fill()
   }
   const tex = new THREE.CanvasTexture(canvas)
