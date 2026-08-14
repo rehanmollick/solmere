@@ -257,6 +257,200 @@ export function makeGrainDataURL() {
   return canvas.toDataURL()
 }
 
+/* ------------------------------------------------------------------
+ * Little treasures painted in dabs: things the tide left on the sand,
+ * and one paper boat for the horizon. Colored textures for flat decals.
+ * ------------------------------------------------------------------ */
+export function makePropTexture(kind, seed) {
+  const s = 256
+  const rand = mulberry(seed)
+  const canvas = document.createElement('canvas')
+  canvas.width = s
+  canvas.height = s
+  const ctx = canvas.getContext('2d')
+  const R = (a, b) => a + (b - a) * rand()
+
+  const dab = (x, y, r, color, alpha, soft = false) => {
+    if (soft) {
+      const g = ctx.createRadialGradient(x, y, r * 0.2, x, y, r)
+      g.addColorStop(0, color.replace('ALPHA', String(alpha)))
+      g.addColorStop(1, color.replace('ALPHA', '0'))
+      ctx.fillStyle = g
+    } else {
+      ctx.fillStyle = color.replace('ALPHA', String(alpha))
+    }
+    ctx.beginPath()
+    ctx.arc(x, y, r, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  const rgba = (r, g, b) => `rgba(${r},${g},${b},ALPHA)`
+
+  const cx = s / 2
+  const cy = s / 2
+
+  if (kind === 'shell') {
+    const cream = rgba(242, 227, 206)
+    const roseC = rgba(217, 160, 138)
+    const shadowC = rgba(150, 112, 96)
+    // soft ground shadow
+    dab(cx + 8, cy + 12, 62, rgba(96, 78, 70), 0.28, true)
+    // the spiral, wound in dabs
+    let ang = 0
+    let r = 6
+    while (r < 58) {
+      const x = cx + Math.cos(ang) * r * 0.62
+      const y = cy + Math.sin(ang) * r * 0.5
+      dab(x, y, 10 + r * 0.16, Math.floor(ang / 1.6) % 2 ? roseC : cream, 0.95)
+      ang += 0.5
+      r += 1.7
+    }
+    // ridge shadows along the whorl
+    ang = 0.7
+    r = 12
+    while (r < 56) {
+      dab(cx + Math.cos(ang) * r * 0.62, cy + Math.sin(ang) * r * 0.5, 3.5, shadowC, 0.5)
+      ang += 0.85
+      r += 3
+    }
+    dab(cx - 14, cy - 12, 9, rgba(255, 248, 234), 0.85)
+  }
+
+  if (kind === 'star') {
+    const coral = rgba(215, 119, 87)
+    const pale = rgba(242, 201, 168)
+    const deep = rgba(150, 74, 58)
+    dab(cx + 6, cy + 10, 66, rgba(96, 78, 70), 0.26, true)
+    for (let arm = 0; arm < 5; arm++) {
+      const a = (arm / 5) * Math.PI * 2 - Math.PI / 2 + R(-0.06, 0.06)
+      for (let k = 0; k < 12; k++) {
+        const t = k / 11
+        const rr = 12 + t * 62
+        const w = 16 * (1 - t * 0.8)
+        dab(cx + Math.cos(a) * rr + R(-2, 2), cy + Math.sin(a) * rr + R(-2, 2), w, coral, 0.95)
+      }
+      // arm crease
+      dab(cx + Math.cos(a + 0.35) * 26, cy + Math.sin(a + 0.35) * 26, 7, deep, 0.4, true)
+    }
+    dab(cx, cy, 20, coral, 1)
+    for (let i = 0; i < 26; i++) {
+      const a = R(0, Math.PI * 2)
+      const rr = R(4, 62)
+      dab(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr * 0.9, R(1.5, 3.2), pale, 0.9)
+    }
+  }
+
+  if (kind === 'pebbles') {
+    const stones = [
+      [cx - 40, cy + 18, 34, [169, 155, 168]],
+      [cx + 34, cy + 4, 42, [141, 130, 144]],
+      [cx + 2, cy - 38, 26, [186, 172, 180]],
+    ]
+    for (const [x, y, r, c] of stones) {
+      dab(x + 5, y + 8, r * 1.1, rgba(96, 78, 70), 0.24, true)
+      dab(x, y, r, rgba(c[0], c[1], c[2]), 1)
+      for (let i = 0; i < 10; i++) {
+        const a = R(0, Math.PI * 2)
+        dab(
+          x + Math.cos(a) * r * R(0.2, 0.75),
+          y + Math.sin(a) * r * R(0.2, 0.75) * 0.85,
+          R(2, 5),
+          rand() > 0.5 ? rgba(c[0] + 25, c[1] + 22, c[2] + 20) : rgba(c[0] - 20, c[1] - 20, c[2] - 16),
+          0.5
+        )
+      }
+      dab(x - r * 0.3, y - r * 0.34, r * 0.3, rgba(214, 204, 210), 0.75)
+    }
+  }
+
+  if (kind === 'wood') {
+    const bark = rgba(176, 141, 102)
+    const grain = rgba(126, 99, 74)
+    const lightw = rgba(214, 184, 142)
+    dab(cx, cy + 10, 70, rgba(96, 78, 70), 0.22, true)
+    // a bent twig: chain of dabs along a slight curve
+    for (let k = 0; k < 34; k++) {
+      const t = k / 33
+      const x = 30 + t * 196
+      const y = cy + Math.sin(t * Math.PI * 0.9 + 0.4) * 22 + R(-1.5, 1.5)
+      const w = 9 * (1 - Math.abs(t - 0.45) * 1.1) + 2
+      dab(x, y, w, bark, 0.96)
+      if (k % 3 === 0) dab(x, y - w * 0.4, w * 0.45, lightw, 0.7)
+      if (k % 4 === 1) dab(x, y + w * 0.35, w * 0.4, grain, 0.6)
+    }
+    dab(96, cy - 4, 4.5, grain, 0.9)
+    // one stub branch
+    for (let k = 0; k < 7; k++) {
+      const t = k / 6
+      dab(150 + t * 26, cy - 8 - t * 22, 4.5 * (1 - t * 0.6), bark, 0.95)
+    }
+  }
+
+  if (kind === 'boat') {
+    const paper = rgba(247, 241, 230)
+    const fold = rgba(202, 192, 178)
+    const shade = rgba(150, 140, 132)
+    // hull: two folded triangles
+    for (let i = 0; i < 60; i++) {
+      const t = i / 59
+      const x = 48 + t * 160
+      const yTop = 150
+      const yBot = 150 + 44 * Math.sin(Math.min(1, Math.max(0, (t - 0.06) / 0.88)) * Math.PI)
+      for (let y = yTop; y < yBot; y += 6) {
+        dab(x + R(-1, 1), y + R(-1, 1), 5, t > 0.52 ? fold : paper, 0.95)
+      }
+    }
+    // sail
+    for (let i = 0; i < 40; i++) {
+      const t = i / 39
+      const x = 128
+      const h = 92 * (1 - t)
+      for (let k = 0; k < 8; k++) {
+        dab(x - (k / 8) * 52 * (1 - t) + R(-1, 1), 148 - t * 92 + h * 0 + R(-1, 1), 4.5, paper, 0.9)
+      }
+      dab(x + 2, 148 - t * 92, 3.5, shade, 0.5)
+    }
+    // waterline shadow
+    for (let i = 0; i < 22; i++) {
+      dab(60 + i * 7, 196 + R(-2, 2), 5, shade, 0.4, true)
+    }
+  }
+
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.colorSpace = THREE.SRGBColorSpace
+  tex.anisotropy = 2
+  return tex
+}
+
+/* Long ragged horizontal brush pulls for the CSS overlay */
+export function makeStrokeDataURL() {
+  const s = 256
+  const canvas = document.createElement('canvas')
+  canvas.width = s
+  canvas.height = s
+  const ctx = canvas.getContext('2d')
+  const rand = mulberry(4211)
+  ctx.fillStyle = 'rgb(128,128,128)'
+  ctx.fillRect(0, 0, s, s)
+  for (let i = 0; i < 90; i++) {
+    const y = rand() * s
+    const x = rand() * s
+    const len = 30 + rand() * 150
+    const v = 108 + Math.floor(rand() * 40)
+    const alpha = 0.05 + rand() * 0.1
+    ctx.strokeStyle = `rgba(${v},${v},${v},${alpha})`
+    ctx.lineWidth = 1 + rand() * 3
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+    ctx.bezierCurveTo(
+      x + len * 0.3, y + (rand() - 0.5) * 6,
+      x + len * 0.7, y + (rand() - 0.5) * 6,
+      x + len, y + (rand() - 0.5) * 4
+    )
+    ctx.stroke()
+  }
+  return canvas.toDataURL()
+}
+
 /* Shared three-step ramp for every toon material in the scene */
 let toonRamp = null
 export function getToonRamp() {

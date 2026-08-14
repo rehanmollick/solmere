@@ -4,7 +4,105 @@ import { extend, useFrame } from '@react-three/fiber'
 import { shaderMaterial } from '@react-three/drei'
 import { dayState } from './day.js'
 import { ARCH_POS } from './layout.js'
-import { makeNoise2, fbm2, makeBushTexture, getToonRamp } from './paintUtils.js'
+import { makeNoise2, fbm2, makeBushTexture } from './paintUtils.js'
+
+const RockMat = shaderMaterial(
+  {
+    uLit: new THREE.Color('#B5988A'),
+    uShadow: new THREE.Color('#7C6B72'),
+    uMoss: new THREE.Color('#8AA47A'),
+    uRim: new THREE.Color('#FBD9A0'),
+    uHaze: new THREE.Color('#E8D5C0'),
+    uSunDir: new THREE.Vector3(0, 0.4, -1),
+    uGolden: 0,
+  },
+  /* glsl */ `
+  varying vec3 vWorldPos;
+  varying vec3 vNormal;
+  void main() {
+    vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+    vNormal = normalize(mat3(modelMatrix) * normal);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+  `,
+  /* glsl */ `
+  uniform vec3 uLit;
+  uniform vec3 uShadow;
+  uniform vec3 uMoss;
+  uniform vec3 uRim;
+  uniform vec3 uHaze;
+  uniform vec3 uSunDir;
+  uniform float uGolden;
+
+  varying vec3 vWorldPos;
+  varying vec3 vNormal;
+
+  float hash12(vec2 p) {
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+  }
+  float vnoise(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash12(i), hash12(i + vec2(1.0, 0.0)), u.x),
+               mix(hash12(i + vec2(0.0, 1.0)), hash12(i + vec2(1.0, 1.0)), u.x), u.y);
+  }
+  float fbm(vec2 p) {
+    float a = 0.5, s = 0.0;
+    for (int i = 0; i < 4; i++) {
+      s += a * vnoise(p);
+      p = p * 2.13 + vec2(7.7, 3.1);
+      a *= 0.5;
+    }
+    return s;
+  }
+
+  void main() {
+    vec3 P = vWorldPos;
+    // paint in facets: flat planes from screen derivatives, softened by the smooth normal
+    vec3 facetN = normalize(cross(dFdx(P), dFdy(P)));
+    vec3 N = normalize(mix(facetN, normalize(vNormal), 0.35));
+    vec3 L = normalize(uSunDir);
+    vec3 V = normalize(cameraPosition - P);
+
+    // three tones of poster paint
+    float light = dot(N, L) * 0.5 + 0.5;
+    float band = smoothstep(0.3, 0.46, light) * 0.62 + smoothstep(0.54, 0.72, light) * 0.38;
+    vec3 col = mix(uShadow, uLit, band);
+
+    // strata: sideways brush pulls following the rock's grain
+    float strata = fbm(vec2(P.y * 0.32, P.x * 0.05 + P.z * 0.05));
+    col *= 1.0 + (strata - 0.5) * 0.2;
+
+    // fine chatter of the dry brush
+    float chatter = fbm(P.xy * 0.9 + P.z * 0.4);
+    col *= 1.0 + (chatter - 0.5) * 0.1;
+
+    // moss holds on wherever the rock lies flat enough
+    float mossMask = smoothstep(0.35, 0.7, N.y)
+      * smoothstep(0.4, 0.75, fbm(P.xz * 0.25 + vec2(P.y * 0.18, 3.7)))
+      * smoothstep(3.0, 10.0, P.y);
+    col = mix(col, uMoss, mossMask * 0.75);
+
+    // the sea keeps the feet of the rock dark
+    col *= 1.0 - smoothstep(2.2, -0.5, P.y) * 0.22;
+
+    // backlit rim, strongest when the light threads the keyhole
+    float rim = pow(1.0 - clamp(dot(N, V), 0.0, 1.0), 2.6) * clamp(dot(N, L) + 0.4, 0.0, 1.0);
+    col += uRim * rim * (0.16 + uGolden * 0.55);
+
+    // breathe into the haze with distance
+    float d = length(P - cameraPosition);
+    col = mix(col, uHaze, clamp((d - 70.0) / 300.0, 0.0, 1.0) * 0.75);
+
+    gl_FragColor = vec4(col, 1.0);
+    #include <colorspace_fragment>
+  }
+  `
+)
+
+extend({ RockMat })
 
 const GlowMat = shaderMaterial(
   { uColor: new THREE.Color('#7FE9C3'), uAmount: 0 },
@@ -172,9 +270,6 @@ const BUSH_SPOTS = [
 ]
 
 export default function Arch() {
-  const rockMat = useRef()
-  const isletMatA = useRef()
-  const isletMatB = useRef()
   const bushMats = useRef([])
   const shaftA = useRef()
   const shaftB = useRef()
@@ -184,7 +279,8 @@ export default function Arch() {
   const isletGeoA = useMemo(() => buildIsletGeometry(55, 0.62), [])
   const isletGeoB = useMemo(() => buildIsletGeometry(89, 0.5), [])
   const bushTexture = useMemo(() => makeBushTexture(31), [])
-  const ramp = getToonRamp()
+  const rockMat = useMemo(() => new RockMat(), [])
+  const mossScratch = useMemo(() => new THREE.Color(), [])
 
   const shaftPose = useMemo(() => {
     // steep enough that the camera sees the shaft side-on, never down its throat
@@ -196,9 +292,14 @@ export default function Arch() {
 
   useFrame((state) => {
     const t = state.clock.elapsedTime
-    if (rockMat.current) rockMat.current.color.copy(dayState.colors.rockLit)
-    if (isletMatA.current) isletMatA.current.color.copy(dayState.colors.rockLit)
-    if (isletMatB.current) isletMatB.current.color.copy(dayState.colors.rockShadow)
+    rockMat.uniforms.uLit.value.copy(dayState.colors.rockLit)
+    rockMat.uniforms.uShadow.value.copy(dayState.colors.rockShadow)
+    mossScratch.copy(dayState.colors.grassLit).lerp(dayState.colors.rockShadow, 0.25)
+    rockMat.uniforms.uMoss.value.copy(mossScratch)
+    rockMat.uniforms.uRim.value.copy(dayState.colors.sunHalo)
+    rockMat.uniforms.uHaze.value.copy(dayState.colors.hazeColor)
+    rockMat.uniforms.uSunDir.value.copy(dayState.sunDir)
+    rockMat.uGolden = dayState.golden
     for (const bm of bushMats.current) {
       if (bm) bm.color.copy(dayState.colors.grassLit).lerp(dayState.colors.rockShadow, 0.3)
     }
@@ -223,7 +324,7 @@ export default function Arch() {
   return (
     <group position={ARCH_POS} rotation={[0, -0.22, 0]}>
       <mesh geometry={archGeo}>
-        <meshToonMaterial ref={rockMat} gradientMap={ramp} flatShading />
+        <primitive object={rockMat} attach="material" />
       </mesh>
 
       {BUSH_SPOTS.map(([x, y, z, s], i) => (
@@ -286,10 +387,10 @@ export default function Arch() {
 
       {/* Far islets balancing the composition */}
       <mesh geometry={isletGeoA} position={[-74, -1.5, -48]} scale={[15, 9, 11]}>
-        <meshToonMaterial ref={isletMatA} gradientMap={ramp} flatShading />
+        <primitive object={rockMat} attach="material" />
       </mesh>
       <mesh geometry={isletGeoB} position={[54, -1.5, -46]} scale={[19, 10, 13]}>
-        <meshToonMaterial ref={isletMatB} gradientMap={ramp} flatShading />
+        <primitive object={rockMat} attach="material" />
       </mesh>
     </group>
   )

@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { initSmoothScroll } from './scrollState.js'
-import { makeGrainDataURL } from './scene/paintUtils.js'
+import { makeGrainDataURL, makeStrokeDataURL } from './scene/paintUtils.js'
 import Overlay from './ui/Overlay.jsx'
 import Loader from './ui/Loader.jsx'
 import SoundToggle from './ui/SoundToggle.jsx'
@@ -13,6 +13,7 @@ export default function App() {
   const [ready, setReady] = useState(false)
   const mountedAt = useRef(performance.now())
   const grain = useMemo(makeGrainDataURL, [])
+  const strokes = useMemo(makeStrokeDataURL, [])
 
   useEffect(() => initSmoothScroll(), [])
 
@@ -33,6 +34,11 @@ export default function App() {
         className="grain"
         aria-hidden="true"
         style={{ backgroundImage: `url(${grain})` }}
+      />
+      <div
+        className="strokes"
+        aria-hidden="true"
+        style={{ backgroundImage: `url(${strokes})` }}
       />
       <Overlay />
       <SoundToggle />

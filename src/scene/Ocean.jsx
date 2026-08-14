@@ -115,32 +115,45 @@ const OceanMat = shaderMaterial(
     // Shallow green gives up, the blue takes over: banded ramp offshore
     float shoreDist = abs(P.z - uShorelineZ - waver);
     float depth01 = clamp(shoreDist / 150.0, 0.0, 1.0);
-    depth01 = clamp(depth01 + (fbm(P.xz * 0.045) - 0.5) * 0.22, 0.0, 1.0);
-    vec3 col = mix(uShallow, uDeep, steppedRamp(depth01, 5.0, 0.10));
+    depth01 = clamp(depth01 + (fbm(P.xz * 0.045) - 0.5) * 0.3, 0.0, 1.0);
+    vec3 col = mix(uShallow, uDeep, steppedRamp(depth01, 5.0, 0.13));
 
-    // Horizontal brush streaks
-    float streak = 0.6 * fbm(vec2(P.x * 0.06 + t * 0.03, P.z * 0.70))
-                 + 0.4 * fbm(vec2(P.x * 0.11 - t * 0.02, P.z * 1.30));
-    col *= 1.0 + (streak - 0.5) * 0.16;
+    // Layered horizontal brushwork: long lazy strokes over short choppy ones,
+    // with enough contrast that individual pulls of the brush stay visible
+    float strokeA = fbm(vec2(P.x * 0.045 + t * 0.03, P.z * 0.85));
+    float strokeB = fbm(vec2(P.x * 0.14 - t * 0.02, P.z * 2.1));
+    float strokeC = fbm(vec2(P.x * 0.3 + t * 0.012, P.z * 4.5));
+    float nearRough = 1.0 + smoothstep(120.0, 25.0, length(P - cameraPosition)) * 0.55;
+    col *= 1.0 + ((strokeA - 0.5) * 0.3 + (strokeB - 0.5) * 0.17 + (strokeC - 0.5) * 0.09) * nearRough;
 
-    // Lighter swell crests
-    col *= 1.0 + vSwell * 0.06;
+    // Crests catch the sun, troughs hold the deep
+    col = mix(col, col * 0.92 + uDeep * 0.08, clamp(-vSwell, 0.0, 1.0) * 0.5);
+    col += uSparkleColor * clamp(vSwell, 0.0, 1.0) * 0.055;
 
-    // Sun glitter lane
     vec3 toFrag = P - cameraPosition;
     float camDist = length(toFrag);
+
+    // A painted path of light rolls across the water toward the sun
     float lane = pow(max(dot(normalize(toFrag.xz), normalize(uSunDir.xz)), 0.0), 6.0);
+    float laneWash = lane * smoothstep(-0.06, 0.12, uSunDir.y);
+    col = mix(col, col + uSparkleColor * 0.34, laneWash * (0.35 + 0.35 * strokeA) * uGlitter);
     float sp = sparkle(P.xz * 0.9, t) * smoothstep(190.0, 40.0, camDist);
     col += uSparkleColor * sp * (0.1 + 1.3 * lane) * uGlitter;
 
-    // Foam: rings crawling shoreward plus a lacy solid edge
+    // Foam: rings crawling shoreward, clumped like thick paint, lacy at the edge
     float foamN = fbm(P.xz * 0.5 + vec2(0.0, t * 0.06));
+    float clump = fbm(P.xz * 1.3 + vec2(t * 0.02, 0.0));
     float ring = sin(shoreDist * 0.9 - t * 1.2 + foamN * 3.0);
-    float ringMask = smoothstep(7.5, 0.0, shoreDist);
-    float foam = smoothstep(0.3, 0.55, ring * ringMask);
-    float edge = smoothstep(0.9, 0.0, shoreDist + (foamN - 0.5) * 1.6);
-    foam = smoothstep(0.40, 0.62, clamp(foam + edge, 0.0, 1.0));
-    col = mix(col, uFoam, foam * 0.92);
+    float ringMask = smoothstep(9.0, 0.0, shoreDist);
+    float foam = smoothstep(0.26, 0.5, ring * ringMask);
+    float edge = smoothstep(1.6, 0.0, shoreDist + (foamN - 0.5) * 1.8);
+    foam = smoothstep(0.38, 0.58, clamp(foam + edge, 0.0, 1.0));
+    foam *= 0.6 + 0.4 * smoothstep(0.3, 0.68, clump);
+    col = mix(col, uFoam, foam * 0.96);
+
+    // Luminism: the water glows where it meets the sky, brightest under the sun
+    float horizonBand = smoothstep(200.0, 330.0, camDist);
+    col = mix(col, uHaze + uSparkleColor * 0.12 * (0.4 + 0.6 * lane), horizonBand * 0.55);
 
     // Melt into the sky at the horizon
     float fogF = pow(smoothstep(120.0, 330.0, camDist), 1.3);
@@ -173,7 +186,7 @@ export default function Ocean() {
     m.uniforms.uHaze.value.copy(dayState.colors.hazeColor)
     m.uniforms.uSparkleColor.value.copy(dayState.colors.oceanSparkle)
     m.uniforms.uSunDir.value.copy(dayState.sunDir)
-    m.uGlitter = 0.35 + dayState.golden * 0.75
+    m.uGlitter = 0.35 + dayState.golden * 0.75 + dayState.midday * 0.35
   })
 
   return (

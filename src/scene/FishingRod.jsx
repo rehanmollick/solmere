@@ -3,20 +3,9 @@ import { useMemo, useRef } from 'react'
 import { extend, useFrame } from '@react-three/fiber'
 import { shaderMaterial, QuadraticBezierLine } from '@react-three/drei'
 import { dayState } from './day.js'
-import { BOBBER_POS, ROD_ROOT, SHORELINE_Z } from './layout.js'
+import { BOBBER_POS, ROD_ROOT, waterHeightAt } from './layout.js'
 import { getToonRamp } from './paintUtils.js'
 import { prefersReducedMotion } from '../scrollState.js'
-
-// Mirror of the ocean vertex swell so floating things agree with the water
-function waterHeight(x, z, t) {
-  let h = 0
-  h += 0.5 * Math.sin(x * 0.16 + z * 0.07 + t * 0.9)
-  h += 0.26 * Math.sin(x * -0.11 + z * 0.21 + t * 0.68 + 1.7)
-  h += 0.15 * Math.sin(x * 0.34 + z * 0.27 + t * 1.24 + 4.2)
-  h += 0.09 * Math.sin(x * -0.53 + z * 0.41 + t * 1.71 + 2.3)
-  const shoreCalm = THREE.MathUtils.smoothstep(Math.abs(z - SHORELINE_Z), 2, 26)
-  return h * 0.55 * (0.35 + 0.65 * shoreCalm)
-}
 
 const RippleMat = shaderMaterial(
   { uPhase: 0, uColor: new THREE.Color('#F7EFE2'), uStrength: 0.5 },
@@ -129,7 +118,7 @@ export default function FishingRod({ started }) {
     scratch.tip.copy(tipLocal)
     rodPivot.current.localToWorld(scratch.tip)
 
-    const waterY = waterHeight(BOBBER_POS.x, BOBBER_POS.z, t)
+    const waterY = waterHeightAt(BOBBER_POS.x, BOBBER_POS.z, t)
     if (castK < 1) {
       const k = 1 - Math.pow(1 - castK, 2) // drag slows the flight
       scratch.bob.lerpVectors(scratch.tip, BOBBER_POS, k)

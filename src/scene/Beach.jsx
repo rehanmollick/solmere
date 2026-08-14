@@ -6,6 +6,16 @@ import { dayState } from './day.js'
 import { SHORELINE_Z } from './layout.js'
 import { makeNoise2, fbm2, makeGrassTexture } from './paintUtils.js'
 
+// One deterministic dune field, shared with anything that stands on the sand
+const sandNoise = makeNoise2(41)
+export function sandHeightAt(x, z) {
+  const rise = z - SHORELINE_Z
+  let y = rise > 0 ? rise * 0.24 : rise * 0.1
+  const duneMask = Math.min(1, Math.max(0, (rise - 2) / 8))
+  y += fbm2(sandNoise, x * 0.05, z * 0.05, 3) * 0.9 * duneMask
+  return y
+}
+
 const SandMat = shaderMaterial(
   {
     uTime: 0,
@@ -61,8 +71,28 @@ const SandMat = shaderMaterial(
     // Warm mottled sand, big soft patches over fine tooth
     float patchy = fbm(P.xz * 0.10);
     float tooth = fbm(P.xz * 1.9);
-    float mixv = clamp(patchy * 0.75 + tooth * 0.25 + 0.18, 0.0, 1.0);
+    float mixv = clamp(patchy * 0.72 + tooth * 0.28 + 0.16, 0.0, 1.0);
     vec3 col = mix(uSandShadow, uSandLit, mixv);
+
+    // stray pigment: rose pooled in some hollows, cool mauve in others,
+    // the way a painter lets the underlayer bleed through
+    vec3 rose = uSandLit * vec3(1.04, 0.86, 0.8);
+    vec3 mauve = mix(uSandShadow, uWetTint, 0.45) * vec3(0.94, 0.9, 1.06);
+    float rosePatch = fbm(P.xz * 0.07 + vec2(31.0, 7.0));
+    float mauvePatch = fbm(P.xz * 0.09 + vec2(3.0, 53.0));
+    col = mix(col, rose, smoothstep(0.58, 0.85, rosePatch) * 0.3);
+    col = mix(col, mauve, smoothstep(0.62, 0.88, mauvePatch) * 0.26);
+
+    // rake of the wind: two directions of long shallow strokes
+    float rake = fbm(vec2(P.x * 0.3, P.z * 1.6));
+    float rakeB = fbm(vec2(P.x * 0.7 + P.z * 0.2, P.z * 2.8 + 17.0));
+    col *= 1.0 + (rake - 0.5) * 0.16 + (rakeB - 0.5) * 0.08;
+
+    // the pepper and the mica: dark grains and bright ones
+    float fleck = hash12(floor(P.xz * 9.0) + 4.7);
+    col *= 1.0 - step(0.978, fleck) * 0.16;
+    float mica = hash12(floor(P.xz * 16.0) + 9.1);
+    col += vec3(1.0, 0.96, 0.85) * step(0.988, mica) * 0.1;
 
     // The tide's reach: a wet band that breathes near the waterline
     float waver = sin(P.x * 0.075) * 1.8 + sin(P.x * 0.028 + 2.0) * 1.4;
@@ -119,16 +149,9 @@ export default function Beach() {
     const g = new THREE.PlaneGeometry(260, 44, 120, 60)
     g.rotateX(-Math.PI / 2)
     const meshZ = SHORELINE_Z + 16 // must match the mesh position below
-    const noise = makeNoise2(41)
     const pos = g.attributes.position
     for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i)
-      const worldZ = pos.getZ(i) + meshZ
-      const rise = worldZ - SHORELINE_Z
-      let y = rise > 0 ? rise * 0.24 : rise * 0.1
-      const duneMask = Math.min(1, Math.max(0, (rise - 2) / 8))
-      y += fbm2(noise, x * 0.05, worldZ * 0.05, 3) * 0.9 * duneMask
-      pos.setY(i, y)
+      pos.setY(i, sandHeightAt(pos.getX(i), pos.getZ(i) + meshZ))
     }
     g.computeVertexNormals()
     return g

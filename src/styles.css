@@ -77,7 +77,17 @@ button {
   z-index: 1;
   background-size: 160px 160px;
   mix-blend-mode: overlay;
-  opacity: 0.09;
+  opacity: 0.13;
+  pointer-events: none;
+}
+
+.strokes {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  background-size: 256px 256px;
+  mix-blend-mode: soft-light;
+  opacity: 0.35;
   pointer-events: none;
 }
 

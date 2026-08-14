@@ -33,9 +33,11 @@ const FireflyMat = shaderMaterial(
     float d = length(gl_PointCoord - 0.5) * 2.0;
     float body = smoothstep(1.0, 0.15, d);
     float pulse = 0.35 + 0.65 * smoothstep(0.2, 0.9, 0.5 + 0.5 * sin(uTime * (0.8 + vSeed) + vSeed * 40.0));
-    float a = body * pulse * uDusk;
+    // sunlit motes all day, proper fireflies once the light lets go
+    float a = body * pulse * mix(0.16, 0.95, uDusk);
+    vec3 col = mix(vec3(1.0, 0.95, 0.82), uColor, uDusk);
     if (a < 0.01) discard;
-    gl_FragColor = vec4(uColor, a);
+    gl_FragColor = vec4(col, a);
   }
   `
 )

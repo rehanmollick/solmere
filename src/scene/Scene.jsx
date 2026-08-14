@@ -6,6 +6,7 @@ import CameraRig from './CameraRig.jsx'
 import Sky from './Sky.jsx'
 import Ocean from './Ocean.jsx'
 import Beach from './Beach.jsx'
+import BeachLife from './BeachLife.jsx'
 import Arch from './Arch.jsx'
 import Clouds from './Clouds.jsx'
 import Birds from './Birds.jsx'
@@ -58,7 +59,7 @@ export default function Scene({ onReady, started }) {
   return (
     <Canvas
       flat
-      dpr={[1, 2]}
+      dpr={[1, 1.25]}
       gl={{ antialias: true, powerPreference: 'high-performance' }}
       camera={{ fov: 55, near: 0.1, far: 900, position: [0, 3, 10] }}
       aria-hidden="true"
@@ -68,6 +69,7 @@ export default function Scene({ onReady, started }) {
       <Sky />
       <Ocean />
       <Beach />
+      <BeachLife />
       <Arch />
       <Clouds />
       <Birds />

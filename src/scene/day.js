@@ -9,30 +9,33 @@ const STOPS = [0.0, 0.28, 0.58, 0.88]
 const PALETTES = [
   // dawn
   {
-    skyZenith: '#82A7C7', skyHorizon: '#F6D9B8', sunCore: '#FFF3D6', sunHalo: '#FBD9A0',
+    skyZenith: '#7BA6CE', skyHorizon: '#FAD5A0', sunCore: '#FFF3D6', sunHalo: '#FBD9A0',
     oceanDeep: '#45788F', oceanShallow: '#93BFBB', oceanSparkle: '#FBE9C8', foam: '#F7EFE2',
-    sandLit: '#E9C89B', sandShadow: '#C29B72', cloudLit: '#FDF0DC', cloudShadow: '#C9B8C4',
+    sandLit: '#E9C89B', sandShadow: '#C29B72', cloudLit: '#FFEED6', cloudShadow: '#CFA6B4',
     rockLit: '#B5988A', rockShadow: '#7C6B72', hazeColor: '#E8D5C0',
     grassLit: '#8AA47A', grassShadow: '#5F7A62', bird: '#6A5F63',
     starColor: '#E8D5C0', lanternGlow: '#FFAE5C',
+    washA: '#F2B0A0', washB: '#F8DCA8',
   },
   // midday
   {
-    skyZenith: '#4E90C4', skyHorizon: '#C9E5DA', sunCore: '#FFF8E7', sunHalo: '#FFEDC2',
-    oceanDeep: '#2E7395', oceanShallow: '#74C1B5', oceanSparkle: '#FFF6DA', foam: '#F8F5EA',
-    sandLit: '#EFD5A2', sandShadow: '#C49E74', cloudLit: '#FDFAF0', cloudShadow: '#B7C1D6',
+    skyZenith: '#3B7EC8', skyHorizon: '#DCEEE6', sunCore: '#FFFDF4', sunHalo: '#FFF3D3',
+    oceanDeep: '#23709A', oceanShallow: '#66C6B8', oceanSparkle: '#FFF6DA', foam: '#F8F5EA',
+    sandLit: '#EFD5A2', sandShadow: '#C49E74', cloudLit: '#FFF9EC', cloudShadow: '#8FA8D0',
     rockLit: '#C4A183', rockShadow: '#8A6F6B', hazeColor: '#D7E6E2',
     grassLit: '#84A868', grassShadow: '#567B58', bird: '#5A5560',
     starColor: '#D7E6E2', lanternGlow: '#FFAE5C',
+    washA: '#C9E4F2', washB: '#FFF3CD',
   },
   // golden hour
   {
-    skyZenith: '#667BAE', skyHorizon: '#FFC98B', sunCore: '#FFF2C4', sunHalo: '#FCB162',
+    skyZenith: '#5F76B2', skyHorizon: '#FFC077', sunCore: '#FFF2C4', sunHalo: '#FCA452',
     oceanDeep: '#3E5F86', oceanShallow: '#7FA79E', oceanSparkle: '#FFD98F', foam: '#FBE9D3',
-    sandLit: '#F0BB80', sandShadow: '#A87860', cloudLit: '#FFD9A3', cloudShadow: '#BC8A94',
+    sandLit: '#F0BB80', sandShadow: '#A87860', cloudLit: '#FFDCA0', cloudShadow: '#C27E8E',
     rockLit: '#D89C6E', rockShadow: '#7E5A66', hazeColor: '#F4C69A',
     grassLit: '#A8A26B', grassShadow: '#6E6B55', bird: '#6A4E56',
     starColor: '#F4C69A', lanternGlow: '#FFAE5C',
+    washA: '#FF9E6A', washB: '#FFD98F',
   },
   // dusk
   {
@@ -42,6 +45,7 @@ const PALETTES = [
     rockLit: '#9A7B80', rockShadow: '#4E4766', hazeColor: '#AC8BA0',
     grassLit: '#5C6373', grassShadow: '#3E4356', bird: '#464258',
     starColor: '#FFF4D9', lanternGlow: '#7FE9C3',
+    washA: '#B37BA0', washB: '#E39A78',
   },
 ]
 
@@ -103,6 +107,7 @@ export const dayState = {
   skyMid: new THREE.Color(),
   skyLow: new THREE.Color(),
   sunDir: new THREE.Vector3(0, 0.3, -1),
+  midday: 0, // the heavenly hour
   golden: 0, // light threads the keyhole
   dusk: 0, // blue hour amount
   stars: 0,
@@ -158,6 +163,7 @@ export function updateDay(p) {
     .normalize()
 
   const rise = (lo, hi) => Math.min(1, Math.max(0, (p - lo) / (hi - lo)))
+  dayState.midday = smooth(rise(0.12, 0.24)) * (1 - smooth(rise(0.38, 0.52)))
   dayState.golden = smooth(rise(0.38, 0.54)) * (1 - smooth(rise(0.68, 0.82)))
   dayState.dusk = smooth(rise(0.72, 0.88))
   dayState.stars = smooth(rise(0.7, 0.85))
