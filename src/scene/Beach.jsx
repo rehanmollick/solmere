@@ -65,8 +65,9 @@ const SandMat = shaderMaterial(
     vec3 col = mix(uSandShadow, uSandLit, mixv);
 
     // The tide's reach: a wet band that breathes near the waterline
+    float waver = sin(P.x * 0.075) * 1.8 + sin(P.x * 0.028 + 2.0) * 1.4;
     float tide = sin(uTime * 0.35) * 0.7 + sin(uTime * 0.13 + 2.0) * 0.4;
-    float wetEdge = uShorelineZ + 2.4 + tide + (fbm(P.xz * 0.3) - 0.5) * 1.6;
+    float wetEdge = uShorelineZ + waver + 2.4 + tide + (fbm(P.xz * 0.3) - 0.5) * 1.6;
     float wet = 1.0 - smoothstep(wetEdge - 2.0, wetEdge + 0.4, P.z);
     vec3 wetCol = col * 0.78 + uWetTint * 0.10;
     col = mix(col, wetCol, wet * 0.9);
@@ -117,15 +118,16 @@ export default function Beach() {
   const geometry = useMemo(() => {
     const g = new THREE.PlaneGeometry(260, 44, 120, 60)
     g.rotateX(-Math.PI / 2)
+    const meshZ = SHORELINE_Z + 16 // must match the mesh position below
     const noise = makeNoise2(41)
     const pos = g.attributes.position
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i)
-      const z = pos.getZ(i)
-      const rise = z - SHORELINE_Z
+      const worldZ = pos.getZ(i) + meshZ
+      const rise = worldZ - SHORELINE_Z
       let y = rise > 0 ? rise * 0.24 : rise * 0.1
-      const duneMask = Math.min(1, Math.max(0, (z - SHORELINE_Z - 2) / 8))
-      y += fbm2(noise, x * 0.05, z * 0.05, 3) * 0.9 * duneMask
+      const duneMask = Math.min(1, Math.max(0, (rise - 2) / 8))
+      y += fbm2(noise, x * 0.05, worldZ * 0.05, 3) * 0.9 * duneMask
       pos.setY(i, y)
     }
     g.computeVertexNormals()

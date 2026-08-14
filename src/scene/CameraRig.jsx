@@ -56,6 +56,13 @@ export default function CameraRig() {
       scratch.look.y -= pointer.current.y * 1.0
     }
 
+    // wider lens on tall screens so the rod and the arch both stay in frame
+    const wantFov = state.size.width / state.size.height < 0.75 ? 68 : 55
+    if (state.camera.fov !== wantFov) {
+      state.camera.fov = wantFov
+      state.camera.updateProjectionMatrix()
+    }
+
     state.camera.position.copy(scratch.pos)
     state.camera.lookAt(scratch.look)
   }, -10)

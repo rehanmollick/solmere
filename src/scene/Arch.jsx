@@ -6,6 +6,29 @@ import { dayState } from './day.js'
 import { ARCH_POS } from './layout.js'
 import { makeNoise2, fbm2, makeBushTexture, getToonRamp } from './paintUtils.js'
 
+const GlowMat = shaderMaterial(
+  { uColor: new THREE.Color('#7FE9C3'), uAmount: 0 },
+  /* glsl */ `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+  `,
+  /* glsl */ `
+  uniform vec3 uColor;
+  uniform float uAmount;
+  varying vec2 vUv;
+  void main() {
+    vec2 d = (vUv - vec2(0.5, 0.42)) * vec2(2.4, 1.6);
+    float fall = exp(-dot(d, d) * 2.2);
+    gl_FragColor = vec4(uColor, fall * uAmount);
+  }
+  `
+)
+
+extend({ GlowMat })
+
 const ShaftMat = shaderMaterial(
   {
     uColor: new THREE.Color(1.0, 0.86, 0.58),
@@ -188,8 +211,8 @@ export default function Arch() {
       }
     }
     if (glowMat.current) {
-      glowMat.current.color.copy(dayState.colors.lanternGlow)
-      glowMat.current.opacity = dayState.caveGlow * (0.2 + dayState.dusk * 0.6)
+      glowMat.current.uniforms.uColor.value.copy(dayState.colors.lanternGlow)
+      glowMat.current.uAmount = dayState.caveGlow * (0.25 + dayState.dusk * 0.65)
     }
   })
 
@@ -248,11 +271,11 @@ export default function Arch() {
 
       {/* Some patient light the water makes on its own */}
       <mesh position={[0, 3.2, 0]} renderOrder={9}>
-        <planeGeometry args={[4.6, 7]} />
-        <meshBasicMaterial
+        <planeGeometry args={[7.5, 10]} />
+        <glowMat
           ref={glowMat}
+          key={GlowMat.key}
           transparent
-          opacity={0}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
           side={THREE.DoubleSide}

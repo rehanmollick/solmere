@@ -109,8 +109,11 @@ const OceanMat = shaderMaterial(
     vec3 P = vWorldPos;
     float t = uTime;
 
+    // The waterline wanders like a drawn line, not a ruler
+    float waver = sin(P.x * 0.075) * 1.8 + sin(P.x * 0.028 + 2.0) * 1.4;
+
     // Shallow green gives up, the blue takes over: banded ramp offshore
-    float shoreDist = abs(P.z - uShorelineZ);
+    float shoreDist = abs(P.z - uShorelineZ - waver);
     float depth01 = clamp(shoreDist / 150.0, 0.0, 1.0);
     depth01 = clamp(depth01 + (fbm(P.xz * 0.045) - 0.5) * 0.22, 0.0, 1.0);
     vec3 col = mix(uShallow, uDeep, steppedRamp(depth01, 5.0, 0.10));

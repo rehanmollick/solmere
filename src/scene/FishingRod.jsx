@@ -136,7 +136,7 @@ export default function FishingRod({ started }) {
       scratch.bob.y += Math.sin(k * Math.PI) * 4.2 * (1 - k * 0.3)
     } else {
       const drift = Math.sin(t * 0.26) * 0.2
-      const dip = tug * (0.22 + Math.sin(t * 7) * 0.12)
+      const dip = tug * Math.max(0, Math.sin(t * 6.2)) * 0.3
       scratch.bob.set(BOBBER_POS.x + drift, waterY + 0.1 - dip, BOBBER_POS.z + drift * 0.6)
     }
     bobber.current.position.copy(scratch.bob)
