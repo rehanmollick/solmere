@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { ARCH_HOLE } from './layout.js'
 
 // The whole site is one day on the shore. Scroll progress moves the clock:
 // dawn at the top of the page, blue hour at the bottom. Everything that has
@@ -107,6 +108,7 @@ export const dayState = {
   skyMid: new THREE.Color(),
   skyLow: new THREE.Color(),
   sunDir: new THREE.Vector3(0, 0.3, -1),
+  align: 0, // how locked the setting sun is to the keyhole's circle
   midday: 0, // the heavenly hour
   golden: 0, // light threads the keyhole
   dusk: 0, // blue hour amount
@@ -128,7 +130,11 @@ function segment(p) {
 
 const DEG = Math.PI / 180
 
-export function updateDay(p) {
+const holeDir = new THREE.Vector3()
+const alignedDir = new THREE.Vector3()
+const fallbackCam = new THREE.Vector3(0, 3.4, 11.5)
+
+export function updateDay(p, camPos = fallbackCam) {
   dayState.p = p
   const [i, t] = segment(p)
   const a = LAB[i]
@@ -163,6 +169,26 @@ export function updateDay(p) {
     .normalize()
 
   const rise = (lo, hi) => Math.min(1, Math.max(0, (p - lo) / (hi - lo)))
+
+  // The keyhole promise: through the sunset window the sun leaves its arc
+  // and rides the exact line from your eyes through the circle, sliding
+  // straight down it: dead center at p = 0.6, into the sea inside the slot.
+  const align = smooth(rise(0.48, 0.56)) * (1 - smooth(rise(0.8, 0.88)))
+  dayState.align = align
+  if (align > 0.001) {
+    holeDir.copy(ARCH_HOLE).sub(camPos).normalize()
+    const elHole = Math.asin(holeDir.y)
+    const azHole = Math.atan2(holeDir.x, -holeDir.z)
+    const elSet = elHole + (0.6 - p) * 50 * DEG
+    alignedDir
+      .set(
+        Math.sin(azHole) * Math.cos(elSet),
+        Math.sin(elSet),
+        -Math.cos(azHole) * Math.cos(elSet)
+      )
+      .normalize()
+    dayState.sunDir.lerp(alignedDir, align).normalize()
+  }
   dayState.midday = smooth(rise(0.12, 0.24)) * (1 - smooth(rise(0.38, 0.52)))
   dayState.golden = smooth(rise(0.38, 0.54)) * (1 - smooth(rise(0.68, 0.82)))
   dayState.dusk = smooth(rise(0.72, 0.88))

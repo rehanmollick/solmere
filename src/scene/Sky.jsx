@@ -26,6 +26,7 @@ const SkyMat = shaderMaterial(
     uRayColor: new THREE.Color('#FFF6E2'),
     uRays: 0,
     uGround: new THREE.Color('#E3C9A2'),
+    uAlign: 0,
   },
   /* glsl */ `
   varying vec3 vWorldPos;
@@ -57,6 +58,7 @@ const SkyMat = shaderMaterial(
   uniform vec3 uRayColor;
   uniform float uRays;
   uniform vec3 uGround;
+  uniform float uAlign;
 
   varying vec3 vWorldPos;
 
@@ -183,10 +185,13 @@ const SkyMat = shaderMaterial(
       col = 1.0 - (1.0 - col) * (1.0 - rayLight);
     }
 
-    // Sun disc and a warm double halo
+    // Sun disc and a warm double halo. While the sun rides the keyhole's
+    // line the halo pulls in tight, so the disc sits readable inside the
+    // circle with a ring of burning sky around it.
     float ang = acos(clamp(dot(dir, sunD), -1.0, 1.0));
     float disc = smoothstep(uSunSize, uSunSize * 0.55, ang);
-    float halo = exp(-ang * 5.5) * 0.5 + exp(-ang * 18.0) * 0.35;
+    float halo = exp(-ang * (5.5 + uAlign * 5.0)) * (0.5 - uAlign * 0.22)
+               + exp(-ang * (18.0 + uAlign * 26.0)) * 0.35;
     col = mix(col, uSunCore, disc);
     col += uSunHalo * halo;
 
@@ -239,6 +244,11 @@ export default function Sky() {
     m.uniforms.uWashRose.value.copy(c.washA)
     m.uniforms.uWashGold.value.copy(c.washB)
     m.uStars = dayState.stars
+
+    // through the keyhole window the disc tightens a touch, so a ring of
+    // sky shows around the sun inside the circle
+    m.uSunSize = 0.042 - dayState.align * 0.008
+    m.uAlign = dayState.align
 
     // wash amplitudes by hour: felt at midday, blooming at golden hour
     const g = dayState.golden

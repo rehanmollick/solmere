@@ -18,7 +18,8 @@ export function waterHeightAt(x, z, t) {
 
 // The Keyhole: a stone arch in the sea, right of center
 export const ARCH_POS = new THREE.Vector3(30, 0, -108)
-export const ARCH_HOLE = new THREE.Vector3(30, 11.5, -108) // center of the opening
+// center of the circular opening: arch-local (0, 13.5) + ARCH_POS
+export const ARCH_HOLE = new THREE.Vector3(30, 13.5, -108)
 
 // Where the cast line lands
 export const BOBBER_POS = new THREE.Vector3(6.5, 0, -16)

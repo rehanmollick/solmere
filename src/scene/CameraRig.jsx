@@ -35,7 +35,6 @@ export default function CameraRig() {
     }
     const p = scrollState.eased
     dayState.time = t
-    updateDay(p)
 
     // camera pose from the keyframe path
     let i = 0
@@ -45,6 +44,10 @@ export default function CameraRig() {
     const k = smooth(Math.min(1, Math.max(0, (p - a.p) / (b.p - a.p))))
     scratch.pos.fromArray(a.pos).lerp(scratch.posB.fromArray(b.pos), k)
     scratch.look.fromArray(a.look).lerp(scratch.lookB.fromArray(b.look), k)
+
+    // the day needs to know where you stand: the setting sun aligns itself
+    // to the keyhole as seen from this exact spot
+    updateDay(p, scratch.pos)
 
     if (!prefersReducedMotion) {
       // breathing, and the gaze trailing the pointer
