@@ -25,6 +25,7 @@ const SkyMat = shaderMaterial(
     uLuministAmt: 0.3,
     uRayColor: new THREE.Color('#FFF6E2'),
     uRays: 0,
+    uGround: new THREE.Color('#E3C9A2'),
   },
   /* glsl */ `
   varying vec3 vWorldPos;
@@ -55,6 +56,7 @@ const SkyMat = shaderMaterial(
   uniform float uLuministAmt;
   uniform vec3 uRayColor;
   uniform float uRays;
+  uniform vec3 uGround;
 
   varying vec3 vWorldPos;
 
@@ -138,6 +140,16 @@ const SkyMat = shaderMaterial(
     vec2 suv = vec2(atan(dir.x, dir.z) * 2.0, dir.y * 3.0);
     col *= 1.0 + (fbm(suv * 1.5) - 0.5) * 0.13;
     col *= 1.0 + (fbm(suv * 5.2 + 9.0) - 0.5) * 0.05;
+
+    // long pulls of the flat brush dragged across the sky
+    float az = atan(dir.x, dir.z);
+    float sPull = vnoise(vec2(az * 3.0, y * 26.0 + fbm(suv * 1.3) * 2.2));
+    float sFine = vnoise(vec2(az * 8.0, y * 52.0 + 31.0));
+    col *= 1.0 + (sPull - 0.5) * 0.11 + (sFine - 0.5) * 0.05;
+
+    // the warm paper breathing through the thinnest washes
+    float thin = fbm(suv * 2.3 + 19.0);
+    col = mix(col, uGround, smoothstep(0.7, 0.9, thin) * 0.1);
 
     // Wet-on-wet washes: one warped field, band-pass cut into three pools
     // that sit side by side; each accent pre-mixed toward the local sky so
@@ -247,6 +259,10 @@ export default function Sky() {
     scratch.copy(c.sunCore).lerp(c.sunHalo, 0.25 + g * 0.55)
     m.uniforms.uRayColor.value.copy(scratch)
     m.uRays = Math.min(1, 0.15 + md * 0.45 + g * 0.8) * (1 - du * 0.85)
+
+    // the paper's own warmth under everything
+    scratch.copy(c.sandLit).lerp(c.hazeColor, 0.35)
+    m.uniforms.uGround.value.copy(scratch)
 
     mesh.current.position.copy(state.camera.position)
   })

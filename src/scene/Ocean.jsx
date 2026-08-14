@@ -17,6 +17,7 @@ const OceanMat = shaderMaterial(
     uSunDir: new THREE.Vector3(0.2, 0.3, -1),
     uShorelineZ: SHORELINE_Z,
     uGlitter: 0.4,
+    uGround: new THREE.Color('#E3C9A2'),
   },
   /* glsl */ `
   uniform float uTime;
@@ -55,6 +56,7 @@ const OceanMat = shaderMaterial(
   uniform vec3 uSunDir;
   uniform float uShorelineZ;
   uniform float uGlitter;
+  uniform vec3 uGround;
 
   varying vec3 vWorldPos;
   varying float vSwell;
@@ -139,6 +141,10 @@ const OceanMat = shaderMaterial(
     );
     col *= vec3(1.0) + (sheen - 0.5) * vec3(0.06, 0.08, 0.11);
 
+    // thick paper beneath: warm ground through the thinnest washes
+    float thin = fbm(P.xz * 0.32 + 57.0);
+    col = mix(col, uGround, smoothstep(0.72, 0.9, thin) * 0.12);
+
     // Crests catch the sun, troughs hold the deep
     col = mix(col, col * 0.92 + uDeep * 0.08, clamp(-vSwell, 0.0, 1.0) * 0.5);
     col += uSparkleColor * clamp(vSwell, 0.0, 1.0) * 0.055;
@@ -199,6 +205,7 @@ export default function Ocean() {
     m.uniforms.uHaze.value.copy(dayState.colors.hazeColor)
     m.uniforms.uSparkleColor.value.copy(dayState.colors.oceanSparkle)
     m.uniforms.uSunDir.value.copy(dayState.sunDir)
+    m.uniforms.uGround.value.copy(dayState.colors.sandLit).lerp(dayState.colors.hazeColor, 0.4)
     m.uGlitter = 0.35 + dayState.golden * 0.75 + dayState.midday * 0.35
   })
 

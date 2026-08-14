@@ -88,6 +88,10 @@ const SandMat = shaderMaterial(
     float rakeB = fbm(vec2(P.x * 0.7 + P.z * 0.2, P.z * 2.8 + 17.0));
     col *= 1.0 + (rake - 0.5) * 0.16 + (rakeB - 0.5) * 0.08;
 
+    // the paper ground surfacing where the sand wash ran dry
+    float thin = fbm(P.xz * 0.42 + 91.0);
+    col = mix(col, uWetTint * 0.92, smoothstep(0.7, 0.9, thin) * 0.13);
+
     // the pepper and the mica: dark grains and bright ones
     float fleck = hash12(floor(P.xz * 9.0) + 4.7);
     col *= 1.0 - step(0.978, fleck) * 0.16;

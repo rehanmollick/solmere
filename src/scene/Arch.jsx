@@ -4,23 +4,21 @@ import { extend, useFrame } from '@react-three/fiber'
 import { shaderMaterial } from '@react-three/drei'
 import { dayState } from './day.js'
 import { ARCH_POS } from './layout.js'
-import {
-  makeNoise2,
-  fbm2,
-  makeBushTexture,
-  makeVineTexture,
-  makeFlowerTexture,
-} from './paintUtils.js'
+import { makeNoise2, fbm2 } from './paintUtils.js'
 
 const RockMat = shaderMaterial(
   {
     uLit: new THREE.Color('#B5988A'),
     uShadow: new THREE.Color('#7C6B72'),
-    uMoss: new THREE.Color('#8AA47A'),
+    uVegLit: new THREE.Color('#8AA47A'),
+    uVegDeep: new THREE.Color('#4E6B4E'),
+    uVegGlow: new THREE.Color('#C2CD86'),
     uRim: new THREE.Color('#FBD9A0'),
     uHaze: new THREE.Color('#E8D5C0'),
+    uGround: new THREE.Color('#D8B88E'),
     uSunDir: new THREE.Vector3(0, 0.4, -1),
     uGolden: 0,
+    uVeg: 1,
   },
   /* glsl */ `
   varying vec3 vWorldPos;
@@ -34,11 +32,15 @@ const RockMat = shaderMaterial(
   /* glsl */ `
   uniform vec3 uLit;
   uniform vec3 uShadow;
-  uniform vec3 uMoss;
+  uniform vec3 uVegLit;
+  uniform vec3 uVegDeep;
+  uniform vec3 uVegGlow;
   uniform vec3 uRim;
   uniform vec3 uHaze;
+  uniform vec3 uGround;
   uniform vec3 uSunDir;
   uniform float uGolden;
+  uniform float uVeg;
 
   varying vec3 vWorldPos;
   varying vec3 vNormal;
@@ -79,24 +81,34 @@ const RockMat = shaderMaterial(
 
     // strata: sideways brush pulls following the rock's grain
     float strata = fbm(vec2(P.y * 0.32, P.x * 0.05 + P.z * 0.05));
-    col *= 1.0 + (strata - 0.5) * 0.2;
+    col *= 1.0 + (strata - 0.5) * 0.24;
 
     // fine chatter of the dry brush
     float chatter = fbm(P.xy * 0.9 + P.z * 0.4);
-    col *= 1.0 + (chatter - 0.5) * 0.1;
+    col *= 1.0 + (chatter - 0.5) * 0.12;
 
-    // moss holds on wherever the rock lies flat enough
-    float mossMask = smoothstep(0.35, 0.7, N.y)
-      * smoothstep(0.4, 0.75, fbm(P.xz * 0.25 + vec2(P.y * 0.18, 3.7)))
-      * smoothstep(3.0, 10.0, P.y);
-    col = mix(col, uMoss, mossMask * 0.85);
+    // warm paper ground showing where the paint pulled thin
+    float thin = fbm(P.xy * 0.55 + P.z * 0.35 + 47.0);
+    col = mix(col, uGround, smoothstep(0.7, 0.9, thin) * 0.15);
 
-    // lichen: soft colonies of sage and rust drifting across the faces
-    float lichen = smoothstep(0.6, 0.82, fbm(P.xy * 0.5 + P.z * 0.3 + 13.0))
-      * smoothstep(0.72, 0.45, fbm(P.xy * 1.7 + 31.0));
-    vec3 lichenCol = mix(vec3(0.71, 0.76, 0.6), vec3(0.85, 0.6, 0.42),
-      smoothstep(0.45, 0.55, fbm(P.xy * 0.16 + 91.0)));
-    col = mix(col, lichenCol * (0.6 + 0.4 * band), lichen * 0.28);
+    // ---- the living cap ----
+    // greenery follows the mountain: thickest across the crown, spilling
+    // down every ledge and gully in tongues, never into the splash zone
+    float up = clamp(N.y, 0.0, 1.0);
+    float topness = smoothstep(11.0, 27.0, P.y);
+    float tongues = fbm(vec2(P.x * 0.24 + P.z * 0.1, P.y * 0.055));
+    float patches = fbm(P.xz * 0.3 + vec2(P.y * 0.1, 3.7));
+    float veg = smoothstep(0.42, 0.72,
+      up * 0.6 + topness * 0.62 + (tongues - 0.5) * 0.75 + (patches - 0.5) * 0.35);
+    veg *= smoothstep(2.5, 6.0, P.y) * uVeg;
+
+    // painted green: three tones dabbed wet over the rock
+    float leafDab = fbm(P.xy * 1.5 + P.z * 0.9);
+    float leafFine = fbm(P.xy * 3.4 + vec2(7.0, 2.0));
+    vec3 vegCol = mix(uVegDeep, uVegLit, smoothstep(0.28, 0.72, leafDab * 0.65 + up * 0.35));
+    vegCol = mix(vegCol, uVegGlow, smoothstep(0.7, 0.88, leafFine) * 0.55);
+    vegCol *= (0.72 + 0.28 * band) * (0.92 + (leafFine - 0.5) * 0.3);
+    col = mix(col, vegCol, veg * 0.94);
 
     // the sea keeps the feet of the rock dark
     col *= 1.0 - smoothstep(2.2, -0.5, P.y) * 0.22;
@@ -107,7 +119,7 @@ const RockMat = shaderMaterial(
 
     // breathe into the haze with distance
     float d = length(P - cameraPosition);
-    col = mix(col, uHaze, clamp((d - 70.0) / 300.0, 0.0, 1.0) * 0.75);
+    col = mix(col, uHaze, clamp((d - 70.0) / 300.0, 0.0, 1.0) * 0.7);
 
     gl_FragColor = vec4(col, 1.0);
     #include <colorspace_fragment>
@@ -276,38 +288,7 @@ function buildIsletGeometry(seed, squash) {
   return geo
 }
 
-const BUSH_SPOTS = [
-  [-3.5, 33, 10.5, 5.6],
-  [0.5, 35.8, 10, 6.4],
-  [4.5, 33.2, 10.5, 5.0],
-  [-7.5, 29.5, 10, 4.4],
-  [8.5, 29.8, 10, 4.2],
-  [-11, 24.5, 9.5, 3.8],
-  [11.5, 24, 9.5, 3.6],
-  [-13.5, 18.5, 9, 3.2],
-  [14, 18, 9, 3.0],
-  [-15, 11.5, 8.5, 2.8],
-  [15.5, 11, 8.5, 2.6],
-  [2, 30.5, 11, 3.4],
-]
-
-const VINE_SPOTS = [
-  // [x, topY, z, width, height] — one trails over the keyhole's brow
-  [0, 21.5, 8.5, 9, 10],
-  [-9, 27.5, 9, 7, 11],
-  [7.5, 28.5, 9, 6, 9],
-  [13, 21, 8.5, 5, 8],
-]
-
-const FLOWER_SPOTS = [
-  [-3, 33.5, 11, 4.2],
-  [1.5, 36.2, 10.5, 4.6],
-  [-11.5, 25, 10, 3.0],
-  [9, 30.2, 10.5, 3.2],
-]
-
 export default function Arch() {
-  const bushMats = useRef([])
   const shaftA = useRef()
   const shaftB = useRef()
   const glowMat = useRef()
@@ -315,13 +296,8 @@ export default function Arch() {
   const archGeo = useMemo(buildArchGeometry, [])
   const isletGeoA = useMemo(() => buildIsletGeometry(55, 0.62), [])
   const isletGeoB = useMemo(() => buildIsletGeometry(89, 0.5), [])
-  const bushTexture = useMemo(() => makeBushTexture(31), [])
-  const vineTexture = useMemo(() => makeVineTexture(17), [])
-  const flowerTexture = useMemo(() => makeFlowerTexture(43), [])
   const rockMat = useMemo(() => new RockMat(), [])
-  const mossScratch = useMemo(() => new THREE.Color(), [])
-  const vineMats = useRef([])
-  const flowerMats = useRef([])
+  const scratchColor = useMemo(() => new THREE.Color(), [])
 
   const shaftPose = useMemo(() => {
     // steep enough that the camera sees the shaft side-on, never down its throat
@@ -333,26 +309,19 @@ export default function Arch() {
 
   useFrame((state) => {
     const t = state.clock.elapsedTime
-    rockMat.uniforms.uLit.value.copy(dayState.colors.rockLit)
-    rockMat.uniforms.uShadow.value.copy(dayState.colors.rockShadow)
-    mossScratch.copy(dayState.colors.grassLit).lerp(dayState.colors.rockShadow, 0.25)
-    rockMat.uniforms.uMoss.value.copy(mossScratch)
-    rockMat.uniforms.uRim.value.copy(dayState.colors.sunHalo)
-    rockMat.uniforms.uHaze.value.copy(dayState.colors.hazeColor)
+    const c = dayState.colors
+    rockMat.uniforms.uLit.value.copy(c.rockLit)
+    rockMat.uniforms.uShadow.value.copy(c.rockShadow)
+    rockMat.uniforms.uVegLit.value.copy(c.grassLit)
+    rockMat.uniforms.uVegDeep.value.copy(c.grassShadow)
+    scratchColor.copy(c.grassLit).lerp(c.sunHalo, 0.45)
+    rockMat.uniforms.uVegGlow.value.copy(scratchColor)
+    scratchColor.copy(c.sandLit).lerp(c.hazeColor, 0.4)
+    rockMat.uniforms.uGround.value.copy(scratchColor)
+    rockMat.uniforms.uRim.value.copy(c.sunHalo)
+    rockMat.uniforms.uHaze.value.copy(c.hazeColor)
     rockMat.uniforms.uSunDir.value.copy(dayState.sunDir)
     rockMat.uGolden = dayState.golden
-    for (const bm of bushMats.current) {
-      if (bm) bm.color.copy(dayState.colors.grassLit).lerp(dayState.colors.rockShadow, 0.22)
-    }
-    for (const vm of vineMats.current) {
-      if (vm) vm.color.copy(dayState.colors.grassLit).lerp(dayState.colors.rockShadow, 0.32)
-    }
-    for (const fm of flowerMats.current) {
-      if (fm) {
-        fm.color.set('#F2A0B4').lerp(dayState.colors.rockShadow, dayState.dusk * 0.55)
-        fm.opacity = 0.95 - dayState.dusk * 0.25
-      }
-    }
     const intensity = dayState.golden * 0.42
     for (const s of [shaftA.current, shaftB.current]) {
       if (s) {
@@ -367,57 +336,11 @@ export default function Arch() {
     }
   })
 
-  const setBushMat = (i) => (ref) => {
-    bushMats.current[i] = ref
-  }
-
   return (
     <group position={ARCH_POS} rotation={[0, -0.22, 0]}>
       <mesh geometry={archGeo}>
         <primitive object={rockMat} attach="material" />
       </mesh>
-
-      {BUSH_SPOTS.map(([x, y, z, s], i) => (
-        <sprite key={i} position={[x, y, z]} scale={[s, s * 0.72, 1]}>
-          <spriteMaterial
-            ref={setBushMat(i)}
-            map={bushTexture}
-            transparent
-            depthWrite={false}
-          />
-        </sprite>
-      ))}
-
-      {/* vines trailing off the ledges and over the keyhole's brow */}
-      {VINE_SPOTS.map(([x, topY, z, w, h], i) => (
-        <mesh key={`v${i}`} position={[x, topY - h / 2, z]}>
-          <planeGeometry args={[w, h]} />
-          <meshBasicMaterial
-            ref={(ref) => {
-              vineMats.current[i] = ref
-            }}
-            map={vineTexture}
-            transparent
-            depthWrite={false}
-            side={THREE.DoubleSide}
-            fog={false}
-          />
-        </mesh>
-      ))}
-
-      {/* blossoms scattered through the green */}
-      {FLOWER_SPOTS.map(([x, y, z, s], i) => (
-        <sprite key={`f${i}`} position={[x, y, z]} scale={[s, s, 1]}>
-          <spriteMaterial
-            ref={(ref) => {
-              flowerMats.current[i] = ref
-            }}
-            map={flowerTexture}
-            transparent
-            depthWrite={false}
-          />
-        </sprite>
-      ))}
 
       {/* Light through the keyhole at golden hour */}
       <mesh ref={(m) => m && m.quaternion.copy(shaftPose.quat)} position={shaftPose.mid} renderOrder={10}>
